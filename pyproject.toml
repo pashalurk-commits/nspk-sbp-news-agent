@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "payment-news-agent"
+version = "0.1.0"
+description = "Ежедневная подборка новостей о Visa и Mastercard"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "feedparser>=6.0.11",
+  "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+payment-news-agent = "payment_news_agent.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
