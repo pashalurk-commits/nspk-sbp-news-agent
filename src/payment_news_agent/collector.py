@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import calendar
 import hashlib
+import html
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -15,6 +16,7 @@ from .models import NewsItem
 
 LOGGER = logging.getLogger(__name__)
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search"
+_TAG_RE = re.compile(r"<[^>]+>")
 QUERIES = {
     "Visa": (
         ('"Visa" payments', "en-US", "US", "US:en"),
@@ -50,6 +52,11 @@ def _item_key(brand: str, title: str) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _clean_snippet(raw: str) -> str:
+    text = html.unescape(_TAG_RE.sub(" ", raw or ""))
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def parse_feed(
     content: Union[bytes, str, feedparser.FeedParserDict],
     brand: str,
@@ -69,6 +76,7 @@ def parse_feed(
 
         source_data = entry.get("source") or {}
         source = source_data.get("title", "").strip() or "Неизвестный источник"
+        snippet = _clean_snippet(entry.get("summary") or entry.get("description") or "")
         items.append(
             NewsItem(
                 brand=brand,
@@ -77,6 +85,7 @@ def parse_feed(
                 source=source,
                 published_at=published_at,
                 key=_item_key(brand, title),
+                snippet=snippet,
             )
         )
     return items

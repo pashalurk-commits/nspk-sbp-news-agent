@@ -9,6 +9,7 @@ from .collector import collect_news
 from .config import Settings
 from .mailer import build_message, send_message
 from .state import load_sent_history, only_new, save_sent_items
+from .summarizer import summarize_items
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,8 +30,9 @@ def run() -> int:
         LOGGER.info("Новых новостей нет, письмо не отправляется")
         return 0
 
+    summarized = summarize_items(new_items, settings)
     message = build_message(
-        new_items,
+        summarized,
         mail_from=settings.mail_from or "dry-run@example.com",
         mail_to=settings.mail_to or ("dry-run@example.com",),
         now=now,

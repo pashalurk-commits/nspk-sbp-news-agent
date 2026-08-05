@@ -22,6 +22,9 @@ class Settings:
     limit_per_brand: int
     state_file: Path
     dry_run: bool
+    groq_api_key: str
+    groq_model: str
+    summarize_enabled: bool
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -42,6 +45,10 @@ class Settings:
             limit_per_brand=int(os.getenv("NEWS_LIMIT_PER_BRAND", "20")),
             state_file=Path(os.getenv("STATE_FILE", "state/sent.json")),
             dry_run=dry_run,
+            groq_api_key=os.getenv("GROQ_API_KEY", "").strip(),
+            groq_model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant").strip()
+            or "llama-3.1-8b-instant",
+            summarize_enabled=_as_bool(os.getenv("SUMMARIZE_ENABLED", "true")),
         )
         settings.validate()
         return settings
@@ -62,6 +69,8 @@ class Settings:
         missing = [name for name, value in required.items() if not value]
         if self.smtp_user and not self.smtp_password:
             missing.append("SMTP_PASSWORD")
+        if self.summarize_enabled and not self.groq_api_key:
+            missing.append("GROQ_API_KEY")
         if missing:
             raise ValueError(
                 "Не заданы обязательные переменные: " + ", ".join(missing)

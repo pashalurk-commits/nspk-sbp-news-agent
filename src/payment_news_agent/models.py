@@ -12,3 +12,10 @@ class NewsItem:
     source: str
     published_at: datetime
     key: str
+    snippet: str = ""
+
+
+@dataclass(frozen=True)
+class SummarizedNewsItem:
+    item: NewsItem
+    summary: str
