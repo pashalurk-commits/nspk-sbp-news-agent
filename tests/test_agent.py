@@ -145,6 +145,8 @@ def test_message_contains_table_and_safe_html() -> None:
     assert "Payments &amp; cards" in html
     assert "News &lt;Daily&gt;" in html
     assert "Кратко: платежи &amp; карты &lt;test&gt;" in html
+    assert 'href="https://example.com/?a=1&amp;b=&quot;2&quot;">ссылка</a>' in html
+    assert "https://example.com/?a=1&b=\"2\"" in plain
 
 
 def test_summarize_items_uses_groq_response() -> None:

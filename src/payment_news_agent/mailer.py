@@ -73,7 +73,7 @@ def build_message(
                 f"<td>{html.escape(item.title)}<br>"
                 f"<small>{html.escape(item.source)}</small></td>"
                 f'<td><a href="{html.escape(item.link, quote=True)}">'
-                f"{html.escape(item.link)}</a></td>"
+                "ссылка</a></td>"
                 f"<td>{html.escape(entry.summary)}</td>"
                 "</tr>"
             )
