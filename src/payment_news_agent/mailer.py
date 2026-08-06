@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import logging
 import smtplib
 from collections import defaultdict
 from datetime import datetime
@@ -9,6 +10,8 @@ from typing import Union
 
 from .config import Settings
 from .models import NewsItem, SummarizedNewsItem
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _as_summarized(
@@ -93,10 +96,18 @@ def build_message(
 
 
 def send_message(message: EmailMessage, settings: Settings) -> None:
-    with smtplib.SMTP(
+    LOGGER.info(
+        "Подключение к SMTP %s:%s (ssl=%s, starttls=%s)",
         settings.smtp_host,
         settings.smtp_port,
-        timeout=30,
+        settings.smtp_use_ssl,
+        settings.smtp_use_tls,
+    )
+    smtp_cls = smtplib.SMTP_SSL if settings.smtp_use_ssl else smtplib.SMTP
+    with smtp_cls(
+        settings.smtp_host,
+        settings.smtp_port,
+        timeout=settings.smtp_timeout,
     ) as smtp:
         smtp.ehlo()
         if settings.smtp_use_tls:

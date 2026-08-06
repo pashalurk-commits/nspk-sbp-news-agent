@@ -16,6 +16,8 @@ class Settings:
     smtp_user: str
     smtp_password: str
     smtp_use_tls: bool
+    smtp_use_ssl: bool
+    smtp_timeout: int
     mail_from: str
     mail_to: tuple[str, ...]
     max_age_hours: int
@@ -29,12 +31,20 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         dry_run = _as_bool(os.getenv("DRY_RUN", "false"))
+        smtp_use_ssl = _as_bool(os.getenv("SMTP_USE_SSL") or "false")
+        tls_raw = os.getenv("SMTP_USE_TLS")
+        if tls_raw is None or tls_raw.strip() == "":
+            smtp_use_tls = not smtp_use_ssl
+        else:
+            smtp_use_tls = _as_bool(tls_raw)
         settings = cls(
             smtp_host=os.getenv("SMTP_HOST", ""),
             smtp_port=int(os.getenv("SMTP_PORT") or "587"),
             smtp_user=os.getenv("SMTP_USER", ""),
             smtp_password=os.getenv("SMTP_PASSWORD", ""),
-            smtp_use_tls=_as_bool(os.getenv("SMTP_USE_TLS") or "true"),
+            smtp_use_tls=smtp_use_tls,
+            smtp_use_ssl=smtp_use_ssl,
+            smtp_timeout=int(os.getenv("SMTP_TIMEOUT") or "60"),
             mail_from=os.getenv("MAIL_FROM", ""),
             mail_to=tuple(
                 address.strip()
@@ -58,6 +68,10 @@ class Settings:
             raise ValueError("NEWS_MAX_AGE_HOURS должен быть больше нуля")
         if self.limit_per_brand <= 0:
             raise ValueError("NEWS_LIMIT_PER_BRAND должен быть больше нуля")
+        if self.smtp_timeout <= 0:
+            raise ValueError("SMTP_TIMEOUT должен быть больше нуля")
+        if self.smtp_use_ssl and self.smtp_use_tls:
+            raise ValueError("Задайте либо SMTP_USE_SSL, либо SMTP_USE_TLS, не оба")
         if self.dry_run:
             return
 

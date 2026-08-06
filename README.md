@@ -52,12 +52,14 @@ Repository Secrets:
 - `SMTP_PORT` — порт, обычно `587` для STARTTLS;
 - `SMTP_USER` — SMTP-логин;
 - `SMTP_PASSWORD` — пароль или пароль приложения;
-- `SMTP_USE_TLS` — `true` для STARTTLS;
+- `SMTP_USE_TLS` — `true` для STARTTLS (порт 587);
+- `SMTP_USE_SSL` — `true` для SMTPS (порт 465); не включайте вместе с TLS;
+- `SMTP_TIMEOUT` — таймаут соединения в секундах, по умолчанию `60`;
 - `MAIL_FROM` — адрес отправителя;
 - `MAIL_TO` — один адрес или несколько через запятую.
 
-Для Gmail обычно используются `smtp.gmail.com`, порт `587` и отдельный пароль
-приложения. Обычный пароль аккаунта использовать не следует.
+Для Gmail обычно: `smtp.gmail.com`, порт `587`, `SMTP_USE_TLS=true` и пароль
+приложения. Для Yandex/Mail.ru часто нужен порт `465` и `SMTP_USE_SSL=true`.
 
 ## Настройка Groq
 

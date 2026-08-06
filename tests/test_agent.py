@@ -30,6 +30,8 @@ def _settings(**overrides) -> Settings:
         smtp_user="",
         smtp_password="",
         smtp_use_tls=True,
+        smtp_use_ssl=False,
+        smtp_timeout=60,
         mail_from="",
         mail_to=(),
         max_age_hours=48,
@@ -202,3 +204,28 @@ def test_summarize_items_fallback_without_snippet() -> None:
     result = summarize_items([item], _settings(), caller=broken_caller)
 
     assert result[0].summary == FALLBACK_SUMMARY
+
+
+def test_summarize_items_batches_requests() -> None:
+    items = [
+        NewsItem(
+            brand="Visa",
+            title=f"News {index}",
+            link=f"https://example.com/{index}",
+            source="Example",
+            published_at=NOW,
+            key=f"key-{index}",
+            snippet=f"Snippet {index}",
+        )
+        for index in range(10)
+    ]
+    seen_sizes: list[int] = []
+
+    def fake_caller(settings, batch):
+        seen_sizes.append(len(batch))
+        return {item.key: f"Summary {item.key}" for item in batch}
+
+    result = summarize_items(items, _settings(), caller=fake_caller, batch_size=4)
+
+    assert seen_sizes == [4, 4, 2]
+    assert [entry.summary for entry in result] == [f"Summary key-{i}" for i in range(10)]

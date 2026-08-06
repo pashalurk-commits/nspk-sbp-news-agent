@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any, Callable, Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -13,6 +14,10 @@ from .models import NewsItem, SummarizedNewsItem
 LOGGER = logging.getLogger(__name__)
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 FALLBACK_SUMMARY = "Краткое содержание недоступно"
+BATCH_SIZE = 5
+BATCH_DELAY_SECONDS = 12.0
+SNIPPET_MAX_CHARS = 220
+MAX_RETRIES = 5
 _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 
 SYSTEM_PROMPT = (
@@ -35,15 +40,22 @@ def _fallback_items(items: list[NewsItem]) -> list[SummarizedNewsItem]:
     ]
 
 
+def _truncate(text: str, limit: int = SNIPPET_MAX_CHARS) -> str:
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
 def _build_user_payload(items: list[NewsItem]) -> str:
+    # Без link: он не нужен для саммари и раздувает запрос (Google News URL длинные).
     payload = [
         {
             "key": item.key,
             "brand": item.brand,
-            "title": item.title,
-            "source": item.source,
-            "link": item.link,
-            "snippet": item.snippet,
+            "title": _truncate(item.title, 180),
+            "source": _truncate(item.source, 60),
+            "snippet": _truncate(item.snippet),
         }
         for item in items
     ]
@@ -83,7 +95,29 @@ def _parse_summaries(content: str) -> dict[str, str]:
     return summaries
 
 
-def _call_groq(
+def _retry_after_seconds(error: HTTPError, attempt: int) -> float:
+    header = error.headers.get("Retry-After") if error.headers else None
+    if header:
+        try:
+            return max(float(header), 1.0)
+        except ValueError:
+            pass
+    # Free-tier Groq часто упирается в TPM (~6k/min) — ждём дольше.
+    return min(60.0, 8.0 * (2 ** attempt))
+
+
+def _http_error_details(error: HTTPError) -> str:
+    body = ""
+    try:
+        body = error.read().decode("utf-8", errors="replace")[:300]
+    except Exception:
+        body = ""
+    if body:
+        return f"{error} | {body}"
+    return str(error)
+
+
+def _call_groq_once(
     settings: Settings,
     items: list[NewsItem],
     timeout: int = 60,
@@ -126,10 +160,42 @@ def _call_groq(
     return _parse_summaries(content)
 
 
+def _call_groq(
+    settings: Settings,
+    items: list[NewsItem],
+    timeout: int = 60,
+) -> dict[str, str]:
+    last_error: Optional[Exception] = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            return _call_groq_once(settings, items, timeout=timeout)
+        except HTTPError as exc:
+            details = _http_error_details(exc)
+            last_error = ValueError(details)
+            if exc.code != 429 or attempt >= MAX_RETRIES - 1:
+                raise ValueError(details) from exc
+            delay = _retry_after_seconds(exc, attempt)
+            LOGGER.warning(
+                "Groq 429 Too Many Requests, повтор через %.0f с (попытка %d/%d)",
+                delay,
+                attempt + 1,
+                MAX_RETRIES,
+            )
+            time.sleep(delay)
+    assert last_error is not None
+    raise last_error
+
+
+def _chunked(items: list[NewsItem], size: int) -> list[list[NewsItem]]:
+    return [items[index : index + size] for index in range(0, len(items), size)]
+
+
 def summarize_items(
     items: list[NewsItem],
     settings: Settings,
     caller: Optional[Callable[[Settings, list[NewsItem]], dict[str, str]]] = None,
+    batch_size: int = BATCH_SIZE,
+    batch_delay_seconds: float = BATCH_DELAY_SECONDS,
 ) -> list[SummarizedNewsItem]:
     if not items:
         return []
@@ -143,11 +209,26 @@ def summarize_items(
         return _fallback_items(items)
 
     call = caller or _call_groq
-    try:
-        summaries = call(settings, items)
-    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
-        LOGGER.warning("Саммаризация через Groq не удалась: %s", exc)
-        return _fallback_items(items)
+    summaries: dict[str, str] = {}
+    batches = _chunked(items, batch_size)
+    for index, batch in enumerate(batches):
+        if index > 0 and batch_delay_seconds > 0 and caller is None:
+            LOGGER.info(
+                "Пауза %.0f с перед следующим batch Groq (%d/%d)",
+                batch_delay_seconds,
+                index + 1,
+                len(batches),
+            )
+            time.sleep(batch_delay_seconds)
+        try:
+            LOGGER.info("Саммаризация batch %d/%d (%d шт.)", index + 1, len(batches), len(batch))
+            summaries.update(call(settings, batch))
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
+            LOGGER.warning(
+                "Саммаризация batch (%d шт.) через Groq не удалась: %s",
+                len(batch),
+                exc,
+            )
 
     result: list[SummarizedNewsItem] = []
     for item in items:
