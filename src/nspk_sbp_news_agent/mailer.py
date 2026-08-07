@@ -12,6 +12,7 @@ from .config import Settings
 from .models import NewsItem, SummarizedNewsItem
 
 LOGGER = logging.getLogger(__name__)
+BRANDS = ("МИР", "СБП")
 
 
 def _as_summarized(
@@ -42,17 +43,17 @@ def build_message(
     for entry in summarized:
         grouped[entry.item.brand].append(entry)
 
-    text_parts = [f"Новые новости о платёжных системах — {now:%d.%m.%Y}"]
+    text_parts = [f"Новые новости о МИР и СБП — {now:%d.%m.%Y}"]
     html_parts = [
         "<html><body>",
-        f"<h1>Новые новости о платёжных системах — {now:%d.%m.%Y}</h1>",
+        f"<h1>Новые новости о МИР и СБП — {now:%d.%m.%Y}</h1>",
         "<style>"
         "table{border-collapse:collapse;width:100%;margin-bottom:1.5em}"
         "th,td{border:1px solid #ccc;padding:8px;text-align:left;vertical-align:top}"
         "th{background:#f5f5f5}"
         "</style>",
     ]
-    for brand in ("Visa", "Mastercard"):
+    for brand in BRANDS:
         brand_items = grouped.get(brand, [])
         if not brand_items:
             continue
@@ -82,9 +83,9 @@ def build_message(
 
     count = len(summarized)
     if count == 1:
-        subject = "Visa и Mastercard: 1 новая новость"
+        subject = "МИР и СБП: 1 новая новость"
     else:
-        subject = f"Visa и Mastercard: {count} новых новостей"
+        subject = f"МИР и СБП: {count} новых новостей"
 
     message = EmailMessage()
     message["Subject"] = subject

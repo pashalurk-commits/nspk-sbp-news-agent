@@ -21,7 +21,7 @@ MAX_RETRIES = 5
 _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 
 SYSTEM_PROMPT = (
-    "Ты аналитик новостей о платёжных системах Visa и Mastercard. "
+    "Ты аналитик новостей о платёжных системах МИР и СБП (Система быстрых платежей). "
     "По заголовку, источнику и короткому сниппету из RSS составь "
     "поверхностное краткое содержание на русском языке (1–2 предложения). "
     "Не выдумывай факты, которых нет во входных данных. "
@@ -48,7 +48,7 @@ def _truncate(text: str, limit: int = SNIPPET_MAX_CHARS) -> str:
 
 
 def _build_user_payload(items: list[NewsItem]) -> str:
-    # Без link: он не нужен для саммари и раздувает запрос (Google News URL длинные).
+    # Без link: он не нужен для саммари и раздувает запрос.
     payload = [
         {
             "key": item.key,
@@ -144,7 +144,7 @@ def _call_groq_once(
         headers={
             "Authorization": f"Bearer {settings.groq_api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "payment-news-agent/0.1",
+            "User-Agent": "nspk-sbp-news-agent/0.1",
         },
         method="POST",
     )

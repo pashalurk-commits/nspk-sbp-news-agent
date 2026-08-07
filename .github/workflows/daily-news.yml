@@ -1,4 +1,4 @@
-name: Daily payment news
+name: Daily MIR and SBP news
 
 on:
   schedule:
@@ -38,6 +38,8 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_USE_TLS: ${{ secrets.SMTP_USE_TLS }}
+          SMTP_USE_SSL: ${{ secrets.SMTP_USE_SSL }}
+          SMTP_TIMEOUT: ${{ secrets.SMTP_TIMEOUT }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -46,7 +48,7 @@ jobs:
           NEWS_MAX_AGE_HOURS: "48"
           NEWS_LIMIT_PER_BRAND: "20"
           STATE_FILE: state/sent.json
-        run: payment-news-agent
+        run: nspk-sbp-news-agent
 
       - name: Save sent-news state
         if: success()

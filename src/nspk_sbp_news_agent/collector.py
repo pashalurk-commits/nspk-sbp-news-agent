@@ -15,22 +15,26 @@ import feedparser
 from .models import NewsItem
 
 LOGGER = logging.getLogger(__name__)
+
+# Публичный поисковый RSS Яндекс.Новостей закрыт (редирект на Dzen SSO).
+# Используем Google News RSS с русскоязычными запросами — тот же механизм,
+# что и в исходном агенте Visa/Mastercard.
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search"
 _TAG_RE = re.compile(r"<[^>]+>")
 QUERIES = {
-    "Visa": (
-        ('"Visa" payments', "en-US", "US", "US:en"),
-        ('"Visa" платежи', "ru", "RU", "RU:ru"),
+    "МИР": (
+        ('"МИР" карта платежи НСПК', "ru", "RU", "RU:ru"),
+        ('"платёжная система МИР"', "ru", "RU", "RU:ru"),
     ),
-    "Mastercard": (
-        ('"Mastercard" payments', "en-US", "US", "US:en"),
-        ('"Mastercard" платежи', "ru", "RU", "RU:ru"),
+    "СБП": (
+        ('"СБП" платежи НСПК', "ru", "RU", "RU:ru"),
+        ('"Система быстрых платежей"', "ru", "RU", "RU:ru"),
     ),
 }
 
 
 def _fetch_feed(url: str, timeout: int = 20) -> feedparser.FeedParserDict:
-    request = Request(url, headers={"User-Agent": "payment-news-agent/0.1"})
+    request = Request(url, headers={"User-Agent": "nspk-sbp-news-agent/0.1"})
     with urlopen(request, timeout=timeout) as response:
         return feedparser.parse(response.read())
 
@@ -104,7 +108,7 @@ def collect_news(
     for brand, queries in QUERIES.items():
         for query in queries:
             url = build_feed_url(*query)
-            LOGGER.info("Загрузка RSS для %s (%s)", brand, query[1])
+            LOGGER.info("Загрузка RSS для %s (%s)", brand, query[0])
             try:
                 feed = _fetch_feed(url)
             except OSError as exc:

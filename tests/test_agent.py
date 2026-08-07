@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from payment_news_agent.collector import build_feed_url, parse_feed
-from payment_news_agent.config import Settings
-from payment_news_agent.mailer import build_message
-from payment_news_agent.models import NewsItem, SummarizedNewsItem
-from payment_news_agent.state import load_sent_history, only_new, save_sent_items
-from payment_news_agent.summarizer import FALLBACK_SUMMARY, summarize_items
+from nspk_sbp_news_agent.collector import build_feed_url, parse_feed
+from nspk_sbp_news_agent.config import Settings
+from nspk_sbp_news_agent.mailer import build_message
+from nspk_sbp_news_agent.models import NewsItem, SummarizedNewsItem
+from nspk_sbp_news_agent.state import load_sent_history, only_new, save_sent_items
+from nspk_sbp_news_agent.summarizer import FALLBACK_SUMMARY, summarize_items
 
 
 NOW = datetime(2026, 7, 15, 8, 0, tzinfo=timezone.utc)
@@ -17,7 +17,7 @@ def _rss(items: str) -> str:
     return f"""<?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0">
       <channel>
-        <title>Google News</title>
+        <title>News RSS</title>
         {items}
       </channel>
     </rss>"""
@@ -47,8 +47,8 @@ def _settings(**overrides) -> Settings:
 
 
 def test_build_feed_url_encodes_query_and_locale() -> None:
-    url = build_feed_url('"Visa" платежи', "ru", "RU", "RU:ru")
-    assert "%22Visa%22+%D0%BF%D0%BB%D0%B0%D1%82%D0%B5%D0%B6%D0%B8" in url
+    url = build_feed_url('"СБП" платежи НСПК', "ru", "RU", "RU:ru")
+    assert "%22%D0%A1%D0%91%D0%9F%22" in url
     assert "ceid=RU%3Aru" in url
 
 
@@ -72,14 +72,14 @@ def test_parse_feed_filters_old_and_incomplete_entries() -> None:
     content = _rss(
         f"""
         <item>
-          <title>Visa launches a payment product</title>
+          <title>СБП расширяет переводы</title>
           <link>https://example.com/recent</link>
           <pubDate>{recent}</pubDate>
           <source>Example News</source>
-          <description><![CDATA[<p>Visa unveiled a <b>new</b> product.</p>]]></description>
+          <description><![CDATA[<p>СБП запустила <b>новый</b> сервис.</p>]]></description>
         </item>
         <item>
-          <title>Old Visa news</title>
+          <title>Old SBP news</title>
           <link>https://example.com/old</link>
           <pubDate>{old}</pubDate>
         </item>
@@ -87,18 +87,18 @@ def test_parse_feed_filters_old_and_incomplete_entries() -> None:
         """
     )
 
-    items = parse_feed(content, "Visa", NOW - timedelta(hours=48))
+    items = parse_feed(content, "СБП", NOW - timedelta(hours=48))
 
     assert len(items) == 1
-    assert items[0].title == "Visa launches a payment product"
+    assert items[0].title == "СБП расширяет переводы"
     assert items[0].source == "Example News"
-    assert items[0].snippet == "Visa unveiled a new product."
+    assert items[0].snippet == "СБП запустила новый сервис."
 
 
 def test_state_removes_duplicates_and_persists(tmp_path) -> None:
     state_file = tmp_path / "state" / "sent.json"
     item = NewsItem(
-        brand="Visa",
+        brand="МИР",
         title="News",
         link="https://example.com",
         source="Source",
@@ -115,7 +115,7 @@ def test_state_removes_duplicates_and_persists(tmp_path) -> None:
 
 def test_message_contains_table_and_safe_html() -> None:
     item = NewsItem(
-        brand="Mastercard",
+        brand="МИР",
         title="Payments & cards",
         link='https://example.com/?a=1&b="2"',
         source="News <Daily>",
@@ -139,7 +139,7 @@ def test_message_contains_table_and_safe_html() -> None:
     html = message.get_body(preferencelist=("html",)).get_content()
     assert "Payments & cards" in plain
     assert "Кратко: платежи & карты <test>" in plain
-    assert "Visa и Mastercard: 1 новая новость" == message["Subject"]
+    assert "МИР и СБП: 1 новая новость" == message["Subject"]
     assert "<table>" in html
     assert "Заголовок" in html
     assert "Payments &amp; cards" in html
@@ -151,34 +151,34 @@ def test_message_contains_table_and_safe_html() -> None:
 
 def test_summarize_items_uses_groq_response() -> None:
     item = NewsItem(
-        brand="Visa",
-        title="Visa expands in Europe",
-        link="https://example.com/visa",
+        brand="СБП",
+        title="СБП растёт в регионах",
+        link="https://example.com/sbp",
         source="Example",
         published_at=NOW,
-        key="visa-key",
-        snippet="Visa expands payments in Europe",
+        key="sbp-key",
+        snippet="СБП расширяет платежи в регионах",
     )
 
     def fake_caller(settings, items):
         assert settings.groq_api_key == "test-key"
         assert len(items) == 1
-        return {"visa-key": "Visa расширяет платежи в Европе."}
+        return {"sbp-key": "СБП расширяет платежи в регионах."}
 
     result = summarize_items([item], _settings(), caller=fake_caller)
 
     assert len(result) == 1
-    assert result[0].summary == "Visa расширяет платежи в Европе."
+    assert result[0].summary == "СБП расширяет платежи в регионах."
 
 
 def test_summarize_items_falls_back_on_error() -> None:
     item = NewsItem(
-        brand="Visa",
-        title="Visa news",
-        link="https://example.com/visa",
+        brand="СБП",
+        title="SBP news",
+        link="https://example.com/sbp",
         source="Example",
         published_at=NOW,
-        key="visa-key",
+        key="sbp-key",
         snippet="Короткий сниппет",
     )
 
@@ -192,12 +192,12 @@ def test_summarize_items_falls_back_on_error() -> None:
 
 def test_summarize_items_fallback_without_snippet() -> None:
     item = NewsItem(
-        brand="Mastercard",
-        title="MC news",
-        link="https://example.com/mc",
+        brand="МИР",
+        title="MIR news",
+        link="https://example.com/mir",
         source="Example",
         published_at=NOW,
-        key="mc-key",
+        key="mir-key",
     )
 
     def broken_caller(settings, items):
@@ -211,7 +211,7 @@ def test_summarize_items_fallback_without_snippet() -> None:
 def test_summarize_items_batches_requests() -> None:
     items = [
         NewsItem(
-            brand="Visa",
+            brand="МИР",
             title=f"News {index}",
             link=f"https://example.com/{index}",
             source="Example",

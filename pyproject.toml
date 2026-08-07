@@ -3,9 +3,9 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "payment-news-agent"
+name = "nspk-sbp-news-agent"
 version = "0.1.0"
-description = "Ежедневная подборка новостей о Visa и Mastercard"
+description = "Ежедневная подборка новостей о МИР и СБП"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -19,7 +19,7 @@ dev = [
 ]
 
 [project.scripts]
-payment-news-agent = "payment_news_agent.main:main"
+nspk-sbp-news-agent = "nspk_sbp_news_agent.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
