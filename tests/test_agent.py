@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from nspk_sbp_news_agent.collector import build_feed_url, parse_feed
+from nspk_sbp_news_agent.collector import (
+    build_feed_url,
+    detect_brands,
+    matches_brand,
+    parse_category_feed,
+    parse_feed,
+)
 from nspk_sbp_news_agent.config import Settings
 from nspk_sbp_news_agent.mailer import build_message
 from nspk_sbp_news_agent.models import NewsItem, SummarizedNewsItem
@@ -64,6 +70,47 @@ def test_empty_optional_smtp_values_use_defaults(monkeypatch) -> None:
     assert settings.smtp_use_tls is True
     assert settings.groq_model == "llama-3.1-8b-instant"
     assert settings.summarize_enabled is True
+
+
+def test_matches_brand_filters_relevant_keywords() -> None:
+    assert matches_brand("Льготы по карте «Мир» начали тестировать", "МИР")
+    assert matches_brand("ЦБ обсуждает приватизацию НСПК", "МИР")
+    assert matches_brand("Переводы по СБП выросли в регионах", "СБП")
+    assert matches_brand("Система быстрых платежей расширила лимиты", "СБП")
+    assert not matches_brand("Одиссея стала самым кассовым фильмом", "МИР")
+    assert detect_brands("НСПК обновила правила для СБП и карты Мир") == ["МИР", "СБП"]
+
+
+def test_parse_category_feed_assigns_brands_by_keywords() -> None:
+    recent = "Wed, 15 Jul 2026 07:00:00 GMT"
+    content = _rss(
+        f"""
+        <item>
+          <title>Льготы по карте «Мир» начали тестировать</title>
+          <link>https://example.com/mir</link>
+          <pubDate>{recent}</pubDate>
+          <description><![CDATA[НСПК расширяет программу льгот.]]></description>
+        </item>
+        <item>
+          <title>Погода в Москве</title>
+          <link>https://example.com/weather</link>
+          <pubDate>{recent}</pubDate>
+          <description>Ожидается дождь.</description>
+        </item>
+        <item>
+          <title>Переводы по СБП выросли</title>
+          <link>https://example.com/sbp</link>
+          <pubDate>{recent}</pubDate>
+          <description>Объём операций увеличился.</description>
+        </item>
+        """
+    )
+
+    items = parse_category_feed(content, NOW - timedelta(hours=48), default_source="Ведомости")
+
+    assert len(items) == 2
+    assert {item.brand for item in items} == {"МИР", "СБП"}
+    assert all(item.source == "Ведомости" for item in items)
 
 
 def test_parse_feed_filters_old_and_incomplete_entries() -> None:
